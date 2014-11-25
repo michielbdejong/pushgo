@@ -27,6 +27,7 @@ type Handler struct {
 	logger     *SimpleLogger
 	store      Store
 	router     *Router
+	balancer   Balancer
 	metrics    Statistician
 	tokenKey   []byte
 	propping   PropPinger
@@ -41,6 +42,7 @@ type StatusReport struct {
 	Store            PluginStatus `json:"store"`
 	Pinger           PluginStatus `json:"pinger"`
 	Locator          PluginStatus `json:"locator"`
+	Balancer         PluginStatus `json:"balancer"`
 	Goroutines       int          `json:"goroutines"`
 	Version          string       `json:"version"`
 }
@@ -62,6 +64,7 @@ func (self *Handler) Init(app *Application, config interface{}) error {
 	self.store = app.Store()
 	self.metrics = app.Metrics()
 	self.router = app.Router()
+	self.balancer = app.Balancer()
 	self.tokenKey = app.TokenKey()
 	self.SetPropPinger(app.PropPinger())
 	self.maxDataLen = config.(*HandlerConfig).MaxDataLen
@@ -113,9 +116,12 @@ func (self *Handler) RealStatusHandler(resp http.ResponseWriter,
 	if locator := self.router.Locator(); locator != nil {
 		status.Locator.Healthy, status.Locator.Error = locator.Status()
 	}
+	if balancer := self.balancer; balancer != nil {
+		status.Balancer.Healthy, status.Balancer.Error = balancer.Status()
+	}
 
 	status.Healthy = status.Store.Healthy && status.Pinger.Healthy &&
-		status.Locator.Healthy
+		status.Locator.Healthy && status.Balancer.Healthy
 
 	status.Clients = self.app.ClientCount()
 	status.Goroutines = runtime.NumGoroutine()
